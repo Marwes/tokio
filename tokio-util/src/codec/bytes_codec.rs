@@ -1,7 +1,7 @@
 use crate::codec::decoder::Decoder;
 use crate::codec::encoder::Encoder;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
 use std::io;
 
 /// A simple `Codec` implementation that just ships bytes around.
@@ -29,11 +29,10 @@ impl Decoder for BytesCodec {
     }
 }
 
-impl Encoder for BytesCodec {
-    type Item = Bytes;
+impl Encoder<[u8]> for BytesCodec {
     type Error = io::Error;
 
-    fn encode(&mut self, data: Bytes, buf: &mut BytesMut) -> Result<(), io::Error> {
+    fn encode(&mut self, data: &[u8], buf: &mut BytesMut) -> Result<(), io::Error> {
         buf.reserve(data.len());
         buf.put(data);
         Ok(())

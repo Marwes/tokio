@@ -3,10 +3,10 @@ use std::io;
 
 /// Trait of helper objects to write out messages as bytes, for use with
 /// `FramedWrite`.
-pub trait Encoder {
-    /// The type of items consumed by the `Encoder`
-    type Item;
-
+pub trait Encoder<Item>
+where
+    Item: ?Sized,
+{
     /// The type of encoding errors.
     ///
     /// `FramedWrite` requires `Encoder`s errors to implement `From<io::Error>`
@@ -18,5 +18,5 @@ pub trait Encoder {
     /// This method will encode `item` into the byte buffer provided by `dst`.
     /// The `dst` provided is an internal buffer of the `Framed` instance and
     /// will be written out when possible.
-    fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error>;
+    fn encode(&mut self, item: &Item, dst: &mut BytesMut) -> Result<(), Self::Error>;
 }

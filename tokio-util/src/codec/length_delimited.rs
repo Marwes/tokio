@@ -345,7 +345,7 @@ use crate::codec::{Decoder, Encoder, Framed, FramedRead, FramedWrite};
 
 use tokio::io::{AsyncRead, AsyncWrite};
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 use std::error::Error as StdError;
 use std::io::{self, Cursor};
 use std::{cmp, fmt};
@@ -546,12 +546,11 @@ impl Decoder for LengthDelimitedCodec {
     }
 }
 
-impl Encoder for LengthDelimitedCodec {
-    type Item = Bytes;
+impl Encoder<[u8]> for LengthDelimitedCodec {
     type Error = io::Error;
 
-    fn encode(&mut self, data: Bytes, dst: &mut BytesMut) -> Result<(), io::Error> {
-        let n = (&data).remaining();
+    fn encode(&mut self, data: &[u8], dst: &mut BytesMut) -> Result<(), io::Error> {
+        let n = data.len();
 
         if n > self.builder.max_frame_len {
             return Err(io::Error::new(
@@ -585,7 +584,7 @@ impl Encoder for LengthDelimitedCodec {
         }
 
         // Write the frame to the buffer
-        dst.extend_from_slice(&data[..]);
+        dst.extend_from_slice(data);
 
         Ok(())
     }
@@ -900,7 +899,7 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn new_write<T>(&self, inner: T) -> FramedWrite<T, LengthDelimitedCodec>
+    pub fn new_write<T>(&self, inner: T) -> FramedWrite<T, LengthDelimitedCodec, [u8]>
     where
         T: AsyncWrite,
     {
@@ -922,7 +921,7 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn new_framed<T>(&self, inner: T) -> Framed<T, LengthDelimitedCodec>
+    pub fn new_framed<T>(&self, inner: T) -> Framed<T, LengthDelimitedCodec, [u8]>
     where
         T: AsyncRead + AsyncWrite,
     {

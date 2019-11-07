@@ -179,11 +179,10 @@ impl Decoder for LinesCodec {
     }
 }
 
-impl Encoder for LinesCodec {
-    type Item = String;
+impl Encoder<str> for LinesCodec {
     type Error = LinesCodecError;
 
-    fn encode(&mut self, line: String, buf: &mut BytesMut) -> Result<(), LinesCodecError> {
+    fn encode(&mut self, line: &str, buf: &mut BytesMut) -> Result<(), LinesCodecError> {
         buf.reserve(line.len() + 1);
         buf.put(line.as_bytes());
         buf.put_u8(b'\n');

@@ -28,14 +28,13 @@ impl Decoder for U32Codec {
     }
 }
 
-impl Encoder for U32Codec {
-    type Item = u32;
+impl Encoder<u32> for U32Codec {
     type Error = io::Error;
 
-    fn encode(&mut self, item: u32, dst: &mut BytesMut) -> io::Result<()> {
+    fn encode(&mut self, item: &u32, dst: &mut BytesMut) -> io::Result<()> {
         // Reserve space
         dst.reserve(4);
-        dst.put_u32(item);
+        dst.put_u32(*item);
         Ok(())
     }
 }

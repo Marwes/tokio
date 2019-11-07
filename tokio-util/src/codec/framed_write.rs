@@ -14,15 +14,17 @@ use log::trace;
 use pin_project_lite::pin_project;
 use std::fmt;
 use std::io::{self, BufRead, Read};
-use std::mem::MaybeUninit;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::mem::MaybeUninit;
 
 pin_project! {
     /// A `Sink` of frames encoded to an `AsyncWrite`.
-    pub struct FramedWrite<T, E> {
+    pub struct FramedWrite<T, E, I: ?Sized> {
         #[pin]
         inner: FramedWrite2<Fuse<T, E>>,
+        _item: PhantomData<I>,
     }
 }
 
@@ -37,23 +39,28 @@ pin_project! {
 const INITIAL_CAPACITY: usize = 8 * 1024;
 const BACKPRESSURE_BOUNDARY: usize = INITIAL_CAPACITY;
 
-impl<T, E> FramedWrite<T, E>
+impl<T, E, I> FramedWrite<T, E, I>
 where
     T: AsyncWrite,
-    E: Encoder,
+    E: Encoder<I>,
+    I: ?Sized,
 {
     /// Creates a new `FramedWrite` with the given `encoder`.
-    pub fn new(inner: T, encoder: E) -> FramedWrite<T, E> {
+    pub fn new(inner: T, encoder: E) -> FramedWrite<T, E, I> {
         FramedWrite {
             inner: framed_write2(Fuse {
                 io: inner,
                 codec: encoder,
             }),
+            _item: PhantomData::default(),
         }
     }
 }
 
-impl<T, E> FramedWrite<T, E> {
+impl<T, E, I> FramedWrite<T, E, I>
+where
+    I: ?Sized,
+{
     /// Returns a reference to the underlying I/O stream wrapped by
     /// `FramedWrite`.
     ///
@@ -95,11 +102,12 @@ impl<T, E> FramedWrite<T, E> {
 }
 
 // This impl just defers to the underlying FramedWrite2
-impl<T, I, E> Sink<I> for FramedWrite<T, E>
+impl<T, I, E> Sink<&I> for FramedWrite<T, E, I>
 where
     T: AsyncWrite,
-    E: Encoder<Item = I>,
+    E: Encoder<I>,
     E::Error: From<io::Error>,
+    I: Unpin + ?Sized,
 {
     type Error = E::Error;
 
@@ -107,7 +115,7 @@ where
         self.project().inner.poll_ready(cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: &I) -> Result<(), Self::Error> {
         self.project().inner.start_send(item)
     }
 
@@ -120,7 +128,7 @@ where
     }
 }
 
-impl<T, D> Stream for FramedWrite<T, D>
+impl<T, D, I> Stream for FramedWrite<T, D, I>
 where
     T: Stream,
 {
@@ -137,7 +145,7 @@ where
     }
 }
 
-impl<T, U> fmt::Debug for FramedWrite<T, U>
+impl<T, U, I> fmt::Debug for FramedWrite<T, U, I>
 where
     T: fmt::Debug,
     U: fmt::Debug,
@@ -186,12 +194,13 @@ impl<T> FramedWrite2<T> {
     }
 }
 
-impl<I, T> Sink<I> for FramedWrite2<T>
+impl<I, T> Sink<&I> for FramedWrite2<T>
 where
     T: ProjectFuse + AsyncWrite,
-    T::Codec: Encoder<Item = I>,
+    T::Codec: Encoder<I>,
+    I: ?Sized,
 {
-    type Error = <T::Codec as Encoder>::Error;
+    type Error = <T::Codec as Encoder<I>>::Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         // If the buffer is already over 8KiB, then attempt to flush it. If after flushing it's
@@ -210,7 +219,7 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: &I) -> Result<(), Self::Error> {
         let mut pinned = self.project();
         pinned
             .inner

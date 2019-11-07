@@ -28,7 +28,7 @@ fn bytes_encoder() {
 
     let mut buf = BytesMut::new();
     codec
-        .encode(Bytes::from_static(&[0; INLINE_CAP + 1]), &mut buf)
+        .encode(&Bytes::from_static(&[0; INLINE_CAP + 1]), &mut buf)
         .unwrap();
 
     // Default capacity of Framed Read
@@ -36,7 +36,7 @@ fn bytes_encoder() {
 
     let mut buf = BytesMut::with_capacity(INITIAL_CAPACITY);
     codec
-        .encode(Bytes::from_static(&[0; INITIAL_CAPACITY + 1]), &mut buf)
+        .encode(&Bytes::from_static(&[0; INITIAL_CAPACITY + 1]), &mut buf)
         .unwrap();
 }
 
@@ -209,9 +209,9 @@ fn lines_encoder() {
     let mut codec = LinesCodec::new();
     let mut buf = BytesMut::new();
 
-    codec.encode(String::from("line 1"), &mut buf).unwrap();
+    codec.encode(&String::from("line 1"), &mut buf).unwrap();
     assert_eq!("line 1\n", buf);
 
-    codec.encode(String::from("line 2"), &mut buf).unwrap();
+    codec.encode(&String::from("line 2"), &mut buf).unwrap();
     assert_eq!("line 1\nline 2\n", buf);
 }

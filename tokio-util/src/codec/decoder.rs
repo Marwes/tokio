@@ -145,9 +145,9 @@ pub trait Decoder {
     /// If you want to work more directly with the streams and sink, consider
     /// calling `split` on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
-    fn framed<T: AsyncRead + AsyncWrite + Sized>(self, io: T) -> Framed<T, Self>
+    fn framed<T: AsyncRead + AsyncWrite + Sized, E>(self, io: T) -> Framed<T, Self, E>
     where
-        Self: Encoder + Sized,
+        Self: Encoder<E> + Sized,
     {
         Framed::new(io, self)
     }

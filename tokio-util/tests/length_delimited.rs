@@ -7,7 +7,7 @@ use tokio_test::{
 };
 use tokio_util::codec::*;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
 use futures::{pin_mut, Sink, Stream};
 use std::collections::VecDeque;
 use std::io;
@@ -406,7 +406,7 @@ fn write_single_frame_length_adjusted() {
 
     task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
+        assert_ok!(io.as_mut().start_send(b"abcdefghi"));
         assert_ready_ok!(io.as_mut().poll_flush(cx));
         assert!(io.get_ref().calls.is_empty());
     });
@@ -436,7 +436,7 @@ fn write_single_frame_one_packet() {
 
     task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
+        assert_ok!(io.as_mut().start_send(b"abcdefghi"));
         assert_ready_ok!(io.as_mut().poll_flush(cx));
         assert!(io.get_ref().calls.is_empty());
     });
@@ -460,13 +460,13 @@ fn write_single_multi_frame_one_packet() {
 
     task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
+        assert_ok!(io.as_mut().start_send(b"abcdefghi"));
 
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut().start_send(Bytes::from("123")));
+        assert_ok!(io.as_mut().start_send(b"123"));
 
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut().start_send(Bytes::from("hello world")));
+        assert_ok!(io.as_mut().start_send(b"hello world"));
 
         assert_ready_ok!(io.as_mut().poll_flush(cx));
         assert!(io.get_ref().calls.is_empty());
@@ -493,17 +493,17 @@ fn write_single_multi_frame_multi_packet() {
 
     task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
+        assert_ok!(io.as_mut().start_send(b"abcdefghi"));
 
         assert_ready_ok!(io.as_mut().poll_flush(cx));
 
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut().start_send(Bytes::from("123")));
+        assert_ok!(io.as_mut().start_send(b"123"));
 
         assert_ready_ok!(io.as_mut().poll_flush(cx));
 
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut().start_send(Bytes::from("hello world")));
+        assert_ok!(io.as_mut().start_send(b"hello world"));
 
         assert_ready_ok!(io.as_mut().poll_flush(cx));
         assert!(io.get_ref().calls.is_empty());
@@ -527,7 +527,7 @@ fn write_single_frame_would_block() {
 
     task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
+        assert_ok!(io.as_mut().start_send(b"abcdefghi"));
 
         assert_pending!(io.as_mut().poll_flush(cx));
         assert_pending!(io.as_mut().poll_flush(cx));
@@ -550,7 +550,7 @@ fn write_single_frame_little_endian() {
 
     task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
+        assert_ok!(io.as_mut().start_send(b"abcdefghi"));
 
         assert_ready_ok!(io.as_mut().poll_flush(cx));
         assert!(io.get_ref().calls.is_empty());
@@ -570,7 +570,7 @@ fn write_single_frame_with_short_length_field() {
 
     task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
+        assert_ok!(io.as_mut().start_send(b"abcdefghi"));
 
         assert_ready_ok!(io.as_mut().poll_flush(cx));
 
@@ -587,7 +587,7 @@ fn write_max_frame_len() {
 
     task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_err!(io.as_mut().start_send(Bytes::from("abcdef")));
+        assert_err!(io.as_mut().start_send(b"abcdef"));
 
         assert!(io.get_ref().calls.is_empty());
     });
@@ -604,13 +604,13 @@ fn write_update_max_frame_len_at_rest() {
 
     task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
+        assert_ok!(io.as_mut().start_send(b"abcdef"));
 
         assert_ready_ok!(io.as_mut().poll_flush(cx));
 
         io.encoder_mut().set_max_frame_length(5);
 
-        assert_err!(io.as_mut().start_send(Bytes::from("abcdef")));
+        assert_err!(io.as_mut().start_send(b"abcdef"));
 
         assert!(io.get_ref().calls.is_empty());
     });
@@ -629,7 +629,7 @@ fn write_update_max_frame_len_in_flight() {
 
     task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
+        assert_ok!(io.as_mut().start_send(b"abcdef"));
 
         assert_pending!(io.as_mut().poll_flush(cx));
 
@@ -637,7 +637,7 @@ fn write_update_max_frame_len_in_flight() {
 
         assert_ready_ok!(io.as_mut().poll_flush(cx));
 
-        assert_err!(io.as_mut().start_send(Bytes::from("abcdef")));
+        assert_err!(io.as_mut().start_send(b"abcdef"));
         assert!(io.get_ref().calls.is_empty());
     });
 }
@@ -649,7 +649,7 @@ fn write_zero() {
 
     task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
-        assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
+        assert_ok!(io.as_mut().start_send(b"abcdef"));
 
         assert_ready_err!(io.as_mut().poll_flush(cx));
 
@@ -668,7 +668,7 @@ fn encode_overflow() {
     buf.put_slice(&some_as[..]);
 
     // Trying to encode the length header should resize the buffer if it won't fit.
-    codec.encode(Bytes::from("hello"), &mut buf).unwrap();
+    codec.encode(b"hello", &mut buf).unwrap();
 }
 
 // ===== Test utils =====
