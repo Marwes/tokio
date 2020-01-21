@@ -14,7 +14,6 @@ use pin_project_lite::pin_project;
 use std::fmt;
 use std::io::{self, BufRead, Read, Write};
 use std::mem::MaybeUninit;
-use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -23,10 +22,9 @@ pin_project! {
     /// the `Encoder` and `Decoder` traits to encode and decode frames.
     ///
     /// You can create a `Framed` instance by using the `AsyncRead::framed` adapter.
-    pub struct Framed<T, U, I: ?Sized> {
+    pub struct Framed<T, U> {
         #[pin]
         inner: FramedRead2<FramedWrite2<Fuse<T, U>>>,
-        _item: PhantomData<I>,
     }
 }
 
@@ -60,11 +58,9 @@ impl<T, U> ProjectFuse for Fuse<T, U> {
     }
 }
 
-impl<T, U, I> Framed<T, U, I>
+impl<T, U> Framed<T, U>
 where
     T: AsyncRead + AsyncWrite,
-    U: Decoder + Encoder<I>,
-    I: ?Sized,
 {
     /// Provides a `Stream` and `Sink` interface for reading and writing to this
     /// `Io` object, using `Decode` and `Encode` to read and write the raw data.
@@ -83,15 +79,17 @@ where
     /// If you want to work more directly with the streams and sink, consider
     /// calling `split` on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
-    pub fn new(inner: T, codec: U) -> Framed<T, U, I> {
+    pub fn new(inner: T, codec: U) -> Framed<T, U>
+    where
+        U: Decoder,
+    {
         Framed {
             inner: framed_read2(framed_write2(Fuse { io: inner, codec })),
-            _item: PhantomData::default(),
         }
     }
 }
 
-impl<T, U, I> Framed<T, U, I> {
+impl<T, U> Framed<T, U> {
     /// Provides a `Stream` and `Sink` interface for reading and writing to this
     /// `Io` object, using `Decode` and `Encode` to read and write the raw data.
     ///
@@ -112,7 +110,7 @@ impl<T, U, I> Framed<T, U, I> {
     /// If you want to work more directly with the streams and sink, consider
     /// calling `split` on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
-    pub fn from_parts(parts: FramedParts<T, U, I>) -> Framed<T, U, I> {
+    pub fn from_parts(parts: FramedParts<T, U>) -> Framed<T, U> {
         Framed {
             inner: framed_read2_with_buffer(
                 framed_write2_with_buffer(
@@ -124,7 +122,6 @@ impl<T, U, I> Framed<T, U, I> {
                 ),
                 parts.read_buf,
             ),
-            _item: PhantomData::default(),
         }
     }
 
@@ -186,7 +183,7 @@ impl<T, U, I> Framed<T, U, I> {
     /// Note that care should be taken to not tamper with the underlying stream
     /// of data coming in as it may corrupt the stream of frames otherwise
     /// being worked with.
-    pub fn into_parts(self) -> FramedParts<T, U, I> {
+    pub fn into_parts(self) -> FramedParts<T, U> {
         let (inner, read_buf) = self.inner.into_parts();
         let (inner, write_buf) = inner.into_parts();
 
@@ -195,16 +192,14 @@ impl<T, U, I> Framed<T, U, I> {
             codec: inner.codec,
             read_buf,
             write_buf,
-            _item: PhantomData::default(),
         }
     }
 }
 
-impl<T, U, I> Stream for Framed<T, U, I>
+impl<T, U> Stream for Framed<T, U>
 where
     T: AsyncRead,
     U: Decoder,
-    I: Unpin,
 {
     type Item = Result<U::Item, U::Error>;
 
@@ -213,11 +208,10 @@ where
     }
 }
 
-impl<T, U, I> Sink<&I> for Framed<T, U, I>
+impl<T, U, I> Sink<I> for Framed<T, U>
 where
     T: AsyncWrite,
     U: Encoder<I>,
-    I: ?Sized,
     U::Error: From<io::Error>,
 {
     type Error = U::Error;
@@ -226,7 +220,7 @@ where
         self.project().inner.get_pin_mut().poll_ready(cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: &I) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
         self.project().inner.get_pin_mut().start_send(item)
     }
 
@@ -239,7 +233,7 @@ where
     }
 }
 
-impl<T, U, I> fmt::Debug for Framed<T, U, I>
+impl<T, U> fmt::Debug for Framed<T, U>
 where
     T: fmt::Debug,
     U: fmt::Debug,
@@ -335,13 +329,10 @@ impl<T, U: Decoder> Decoder for Fuse<T, U> {
     }
 }
 
-impl<T, U: Encoder<I>, I> Encoder<I> for Fuse<T, U>
-where
-    I: ?Sized,
-{
+impl<T, U: Encoder<I>, I> Encoder<I> for Fuse<T, U> {
     type Error = U::Error;
 
-    fn encode(&mut self, item: &I, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: I, dst: &mut BytesMut) -> Result<(), Self::Error> {
         self.codec.encode(item, dst)
     }
 }
@@ -350,7 +341,7 @@ where
 /// It can be used to construct a new `Framed` with a different codec.
 /// It contains all current buffers and the inner transport.
 #[derive(Debug)]
-pub struct FramedParts<T, U, I> {
+pub struct FramedParts<T, U> {
     /// The inner transport used to read bytes to and write bytes to
     pub io: T,
 
@@ -362,24 +353,19 @@ pub struct FramedParts<T, U, I> {
 
     /// A buffer with unprocessed data which are not written yet.
     pub write_buf: BytesMut,
-
-    /// This private field allows us to add additional fields in the future in a
-    /// backwards compatible way.
-    _item: PhantomData<I>,
 }
 
-impl<T, U, I> FramedParts<T, U, I>
-where
-    U: Encoder<I>,
-{
+impl<T, U> FramedParts<T, U> {
     /// Create a new, default, `FramedParts`
-    pub fn new(io: T, codec: U) -> FramedParts<T, U, I> {
+    pub fn new<I>(io: T, codec: U) -> FramedParts<T, U>
+    where
+        U: Encoder<I>,
+    {
         FramedParts {
             io,
             codec,
             read_buf: BytesMut::new(),
             write_buf: BytesMut::new(),
-            _item: PhantomData::default(),
         }
     }
 }

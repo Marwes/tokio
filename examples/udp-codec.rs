@@ -73,7 +73,7 @@ async fn pong(socket: &mut UdpFramed<BytesCodec>) -> Result<(), io::Error> {
     while let Ok(Some(Ok((bytes, addr)))) = time::timeout(timeout, socket.next()).await {
         println!("[b] recv: {}", String::from_utf8_lossy(&bytes));
 
-        socket.send((Bytes::from(&b"PONG"[..]), addr)).await?;
+        socket.send((&b"PONG"[..], addr)).await?;
     }
 
     Ok(())

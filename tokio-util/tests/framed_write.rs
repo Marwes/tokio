@@ -31,10 +31,10 @@ struct U32Encoder;
 impl Encoder<u32> for U32Encoder {
     type Error = io::Error;
 
-    fn encode(&mut self, item: &u32, dst: &mut BytesMut) -> io::Result<()> {
+    fn encode(&mut self, item: u32, dst: &mut BytesMut) -> io::Result<()> {
         // Reserve space
         dst.reserve(4);
-        dst.put_u32(*item);
+        dst.put_u32(item);
         Ok(())
     }
 }
@@ -49,11 +49,11 @@ fn write_multi_frame_in_packet() {
 
     task.enter(|cx, _| {
         assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
-        assert!(pin!(framed).start_send(&0).is_ok());
+        assert!(pin!(framed).start_send(0).is_ok());
         assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
-        assert!(pin!(framed).start_send(&1).is_ok());
+        assert!(pin!(framed).start_send(1).is_ok());
         assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
-        assert!(pin!(framed).start_send(&2).is_ok());
+        assert!(pin!(framed).start_send(2).is_ok());
 
         // Nothing written yet
         assert_eq!(1, framed.get_ref().calls.len());
@@ -103,7 +103,7 @@ fn write_hits_backpressure() {
         // Send 8KB. This fills up FramedWrite2 buffer
         for i in 0..ITER {
             assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
-            assert!(pin!(framed).start_send(&(i as u32)).is_ok());
+            assert!(pin!(framed).start_send(i as u32).is_ok());
         }
 
         // Now we poll_ready which forces a flush. The mock pops the front message
@@ -115,7 +115,7 @@ fn write_hits_backpressure() {
         assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
 
         // Send more data. This matches the final message expected by the mock
-        assert!(pin!(framed).start_send(&(ITER as u32)).is_ok());
+        assert!(pin!(framed).start_send(ITER as u32).is_ok());
 
         // Flush the rest of the buffer
         assert!(assert_ready!(pin!(framed).poll_flush(cx)).is_ok());

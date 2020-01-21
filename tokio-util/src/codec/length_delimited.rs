@@ -546,10 +546,14 @@ impl Decoder for LengthDelimitedCodec {
     }
 }
 
-impl Encoder<[u8]> for LengthDelimitedCodec {
+impl<I> Encoder<I> for LengthDelimitedCodec
+where
+    I: AsRef<[u8]>,
+{
     type Error = io::Error;
 
-    fn encode(&mut self, data: &[u8], dst: &mut BytesMut) -> Result<(), io::Error> {
+    fn encode(&mut self, data: I, dst: &mut BytesMut) -> Result<(), io::Error> {
+        let data = data.as_ref();
         let n = data.len();
 
         if n > self.builder.max_frame_len {
@@ -899,7 +903,7 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn new_write<T>(&self, inner: T) -> FramedWrite<T, LengthDelimitedCodec, [u8]>
+    pub fn new_write<T>(&self, inner: T) -> FramedWrite<T, LengthDelimitedCodec>
     where
         T: AsyncWrite,
     {
@@ -921,7 +925,7 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn new_framed<T>(&self, inner: T) -> Framed<T, LengthDelimitedCodec, [u8]>
+    pub fn new_framed<T>(&self, inner: T) -> Framed<T, LengthDelimitedCodec>
     where
         T: AsyncRead + AsyncWrite,
     {

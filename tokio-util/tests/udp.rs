@@ -66,10 +66,14 @@ impl Decoder for ByteCodec {
     }
 }
 
-impl Encoder<[u8]> for ByteCodec {
+impl<I> Encoder<I> for ByteCodec
+where
+    I: AsRef<[u8]>,
+{
     type Error = io::Error;
 
-    fn encode(&mut self, data: &[u8], buf: &mut BytesMut) -> Result<(), io::Error> {
+    fn encode(&mut self, data: I, buf: &mut BytesMut) -> Result<(), io::Error> {
+        let data = data.as_ref();
         buf.reserve(data.len());
         buf.put_slice(data);
         Ok(())

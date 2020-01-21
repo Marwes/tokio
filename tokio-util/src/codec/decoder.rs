@@ -1,4 +1,3 @@
-use crate::codec::encoder::Encoder;
 use crate::codec::Framed;
 
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -145,9 +144,9 @@ pub trait Decoder {
     /// If you want to work more directly with the streams and sink, consider
     /// calling `split` on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
-    fn framed<T: AsyncRead + AsyncWrite + Sized, E>(self, io: T) -> Framed<T, Self, E>
+    fn framed<T: AsyncRead + AsyncWrite + Sized>(self, io: T) -> Framed<T, Self>
     where
-        Self: Encoder<E> + Sized,
+        Self: Sized,
     {
         Framed::new(io, self)
     }

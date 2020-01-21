@@ -14,17 +14,15 @@ use log::trace;
 use pin_project_lite::pin_project;
 use std::fmt;
 use std::io::{self, BufRead, Read};
-use std::marker::PhantomData;
+use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::mem::MaybeUninit;
 
 pin_project! {
     /// A `Sink` of frames encoded to an `AsyncWrite`.
-    pub struct FramedWrite<T, E, I: ?Sized> {
+    pub struct FramedWrite<T, E> {
         #[pin]
         inner: FramedWrite2<Fuse<T, E>>,
-        _item: PhantomData<I>,
     }
 }
 
@@ -39,28 +37,22 @@ pin_project! {
 const INITIAL_CAPACITY: usize = 8 * 1024;
 const BACKPRESSURE_BOUNDARY: usize = INITIAL_CAPACITY;
 
-impl<T, E, I> FramedWrite<T, E, I>
+impl<T, E> FramedWrite<T, E>
 where
     T: AsyncWrite,
-    E: Encoder<I>,
-    I: ?Sized,
 {
     /// Creates a new `FramedWrite` with the given `encoder`.
-    pub fn new(inner: T, encoder: E) -> FramedWrite<T, E, I> {
+    pub fn new(inner: T, encoder: E) -> FramedWrite<T, E> {
         FramedWrite {
             inner: framed_write2(Fuse {
                 io: inner,
                 codec: encoder,
             }),
-            _item: PhantomData::default(),
         }
     }
 }
 
-impl<T, E, I> FramedWrite<T, E, I>
-where
-    I: ?Sized,
-{
+impl<T, E> FramedWrite<T, E> {
     /// Returns a reference to the underlying I/O stream wrapped by
     /// `FramedWrite`.
     ///
@@ -102,12 +94,11 @@ where
 }
 
 // This impl just defers to the underlying FramedWrite2
-impl<T, I, E> Sink<&I> for FramedWrite<T, E, I>
+impl<T, I, E> Sink<I> for FramedWrite<T, E>
 where
     T: AsyncWrite,
     E: Encoder<I>,
     E::Error: From<io::Error>,
-    I: Unpin + ?Sized,
 {
     type Error = E::Error;
 
@@ -115,7 +106,7 @@ where
         self.project().inner.poll_ready(cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: &I) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
         self.project().inner.start_send(item)
     }
 
@@ -128,7 +119,7 @@ where
     }
 }
 
-impl<T, D, I> Stream for FramedWrite<T, D, I>
+impl<T, D> Stream for FramedWrite<T, D>
 where
     T: Stream,
 {
@@ -145,7 +136,7 @@ where
     }
 }
 
-impl<T, U, I> fmt::Debug for FramedWrite<T, U, I>
+impl<T, U> fmt::Debug for FramedWrite<T, U>
 where
     T: fmt::Debug,
     U: fmt::Debug,
@@ -194,11 +185,10 @@ impl<T> FramedWrite2<T> {
     }
 }
 
-impl<I, T> Sink<&I> for FramedWrite2<T>
+impl<I, T> Sink<I> for FramedWrite2<T>
 where
     T: ProjectFuse + AsyncWrite,
     T::Codec: Encoder<I>,
-    I: ?Sized,
 {
     type Error = <T::Codec as Encoder<I>>::Error;
 
@@ -219,7 +209,7 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(self: Pin<&mut Self>, item: &I) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
         let mut pinned = self.project();
         pinned
             .inner
